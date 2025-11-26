@@ -208,9 +208,9 @@ async def mine(req: Request):
     }
     # validate then append
     if chain_is_valid(server_chain + [new_block]):
+        global pending_txs
         server_chain.append(new_block)
         # clear pending txs (those included)
-        global pending_txs
         # remove any pending txs that are in txs_to_include (non-SYSTEM)
         included_serials = set(json.dumps(t, sort_keys=True) for t in txs_to_include if t.get("sender")!="SYSTEM")
         pending_txs = [p for p in pending_txs if json.dumps(p, sort_keys=True) not in included_serials]
