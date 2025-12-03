@@ -2,9 +2,10 @@ from flask import Flask, request, jsonify, render_template, Response, stream_wit
 from blockchain import Blockchain, Transaction
 from miner import Miner
 import json
-import time
 import queue
 import os
+from datetime import datetime
+import pytz
 
 def create_app():
     app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -16,21 +17,39 @@ def create_app():
         "clients": [],  # list of queues for SSE
     }
 
+    # UTC→JST変換関数
+    def now_jst():
+        tz = pytz.timezone("Asia/Tokyo")
+        return datetime.now(tz).strftime("%Y/%m/%d  %H:%M:%S")
+
     # miner with broadcast function
     def broadcast_block(block):
-        # notify all SSE clients with new chain JSON
         payload = json.dumps({"type": "new_block", "chain": app.blockchain_state["blockchain"].to_dict()})
         for q in list(app.blockchain_state["clients"]):
             try:
                 q.put(payload, block=False)
             except Exception:
-                # remove failing queue
                 try:
                     app.blockchain_state["clients"].remove(q)
                 except ValueError:
                     pass
 
-    app.blockchain_state["miner"] = Miner(app.blockchain_state["blockchain"], broadcast_fn=broadcast_block)
+    def broadcast_mining_done():
+        payload = json.dumps({"type": "mining_done"})
+        for q in list(app.blockchain_state["clients"]):
+            try:
+                q.put(payload, block=False)
+            except Exception:
+                try:
+                    app.blockchain_state["clients"].remove(q)
+                except ValueError:
+                    pass
+
+    app.blockchain_state["miner"] = Miner(
+        app.blockchain_state["blockchain"],
+        broadcast_fn=broadcast_block,
+        broadcast_done_fn=broadcast_mining_done
+    )
 
     @app.route("/")
     def index():
@@ -38,7 +57,6 @@ def create_app():
 
     @app.route("/generate_key", methods=["POST"])
     def generate_key():
-        # create ECDSA keypair and return them hex-encoded
         from ecdsa import SigningKey, NIST256p
         sk = SigningKey.generate(curve=NIST256p)
         vk = sk.get_verifying_key()
@@ -48,7 +66,6 @@ def create_app():
 
     @app.route("/local_sign", methods=["POST"])
     def local_sign():
-        # デモ用: クライアントから private key (hex) を受け取り、ECDSA で署名を返す
         data = request.get_json()
         priv_hex = data.get("private_key")
         sender_pub = data.get("sender_pub")
@@ -75,9 +92,7 @@ def create_app():
         if not all([sender, recipient, amount, signature]):
             return jsonify({"error": "missing field"}), 400
         tx = Transaction(sender_pubkey=sender, recipient_pubkey=recipient, amount=amount, signature=signature)
-        # append pending
         app.blockchain_state["blockchain"].add_transaction(tx)
-        # broadcast pending change to SSE clients
         payload = json.dumps({"type": "pending_tx", "pending": app.blockchain_state["blockchain"].pending_transactions})
         for q in list(app.blockchain_state["clients"]):
             try:
@@ -91,8 +106,10 @@ def create_app():
 
     @app.route("/get_chain", methods=["GET"])
     def get_chain():
-        return jsonify({"chain": app.blockchain_state["blockchain"].to_dict(),
-                        "pending": app.blockchain_state["blockchain"].pending_transactions})
+        return jsonify({
+            "chain": app.blockchain_state["blockchain"].to_dict(),
+            "pending": app.blockchain_state["blockchain"].pending_transactions
+        })
 
     @app.route("/get_balance", methods=["GET"])
     def get_balance():
@@ -117,18 +134,19 @@ def create_app():
     def sse_stream():
         def gen(client_q):
             try:
-                # send initial payload
-                init = json.dumps({"type": "init", "chain": app.blockchain_state["blockchain"].to_dict(), "pending": app.blockchain_state["blockchain"].pending_transactions})
+                init = json.dumps({
+                    "type": "init",
+                    "chain": app.blockchain_state["blockchain"].to_dict(),
+                    "pending": app.blockchain_state["blockchain"].pending_transactions
+                })
                 yield f"data: {init}\n\n"
                 while True:
                     try:
-                        data = client_q.get(timeout=30)  # keep-alive
+                        data = client_q.get(timeout=30)
                         yield f"data: {data}\n\n"
                     except queue.Empty:
-                        # send a comment as keepalive
                         yield ": keep-alive\n\n"
             finally:
-                # cleanup
                 try:
                     app.blockchain_state["clients"].remove(client_q)
                 except Exception:
@@ -140,7 +158,7 @@ def create_app():
 
     return app
 
-# For local debug
+# For local debug / Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     create_app().run(host="0.0.0.0", port=port)
