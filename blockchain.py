@@ -26,7 +26,7 @@ class Block:
     def __init__(self, index, previous_hash, transactions, timestamp=None, nonce=0):
         self.index = index
         self.timestamp = timestamp or time.time()
-        self.transactions = transactions  # list of dict
+        self.transactions = transactions
         self.previous_hash = previous_hash
         self.nonce = nonce
         self.hash = None
@@ -59,7 +59,6 @@ class Blockchain:
         return self.chain[-1]
 
     def mine_block(self, miner_address, reward=1):
-        # reward transaction
         reward_tx = Transaction(sender_pubkey="SYSTEM", recipient_pubkey=miner_address, amount=reward, signature=None)
         txs = self.pending_transactions + [reward_tx.to_dict()]
         index = len(self.chain)
@@ -90,7 +89,6 @@ class Blockchain:
             return False
 
     def verify_transaction(self, tx_dict):
-        # Check signature & balance
         sender = tx_dict["sender"]
         recipient = tx_dict["recipient"]
         amount = tx_dict["amount"]
@@ -102,7 +100,7 @@ class Blockchain:
         msg = f"{sender}:{recipient}:{amount}"
         if not self.validate_signature(sender, signature, msg):
             return False
-        # balance check
+        
         bal = self.get_balance(sender)
         return bal >= amount
 
