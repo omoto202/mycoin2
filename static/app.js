@@ -30,7 +30,6 @@ function showKeys() {
   el.textContent = `public: ${k.public || "(なし)"}\nprivate: ${k.private ? "(保存済)" : "(なし)"}`;
 }
 
-// request server to generate keypair
 document.getElementById("genKeyBtn").addEventListener("click", async () => {
   const res = await fetch("/generate_key", {method: "POST"});
   const j = await res.json();
@@ -53,6 +52,7 @@ document.getElementById("sendTxBtn").addEventListener("click", async () => {
     alert("受信者と金額を入力してください。");
     return;
   }
+  const msg = `${keys.public}:${recipient}:${amount}`;
   const res = await fetch("/submit_tx", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
@@ -85,68 +85,23 @@ document.getElementById("checkBalanceBtn").addEventListener("click", async () =>
   document.getElementById("balanceResult").textContent = JSON.stringify(j);
 });
 
-// display chain in requested format
-function displayChain(chain) {
-  if (!Array.isArray(chain)) {
-    document.getElementById("chainView").textContent = "(invalid chain)";
-    return;
-  }
-  const lines = chain.map(b => {
-    const txs = Array.isArray(b.transactions) ? b.transactions.map(t => {
-      // show only sender -> recipient : amount
-      const sender = t.sender || t.sender === undefined ? t.sender : t["sender"];
-      const recipient = t.recipient || t.recipient === undefined ? t.recipient : t["recipient"];
-      const amount = t.amount || t.amount === undefined ? t.amount : t["amount"];
-      return `  ${sender} → ${recipient} : ${amount}`;
-    }).join("\n") : "";
-
-    // ensure keys exist (handle different naming if any)
-    const idx = b.index ?? b.idx ?? "(no index)";
-    const ts = b.timestamp ?? "(no timestamp)";
-    const nonce = b.nonce ?? "(no nonce)";
-    const hash = b.hash ?? "(no hash)";
-    const prev = b.previous_hash ?? b.prev_hash ?? "(no previous_hash)";
-
-    return [
-      `Block #${idx}`,
-      `Timestamp: ${ts}`,
-      `Nonce: ${nonce}`,
-      `Hash: ${hash}`,
-      `Prev: ${prev}`,
-      `Transactions:`,
-      `${txs}`,
-      `------------------------------`
-    ].join("\n");
-  });
-  document.getElementById("chainView").textContent = lines.join("\n");
-}
-
-// refresh chain (use longer chain between server and local)
 document.getElementById("refreshChainBtn").addEventListener("click", async () => {
   const res = await fetch("/get_chain");
   const j = await res.json();
-  const serverChain = Array.isArray(j.chain) ? j.chain : [];
-  const localChain = JSON.parse(localStorage.getItem(KEYS.CHAIN) || "[]");
-
-  const longest = serverChain.length >= localChain.length ? serverChain : localChain;
-  localStorage.setItem(KEYS.CHAIN, JSON.stringify(longest));
-
-  displayChain(longest);
+  localStorage.setItem(KEYS.CHAIN, JSON.stringify(j.chain));
+  document.getElementById("chainView").textContent = formatChain(j.chain);
 });
 
-// clear local stored chain/pending
 document.getElementById("clearLocalDataBtn").addEventListener("click", () => {
   localStorage.removeItem(KEYS.PENDING);
   localStorage.removeItem(KEYS.CHAIN);
-  alert("ローカルストレージを削除しました。");
+  alert("ローカルのトランザクションとチェーンを削除しました。");
 });
 
-// mining status + start
 const miningStatusEl = document.getElementById("miningStatus");
 document.getElementById("startMiningBtn").addEventListener("click", async () => {
   const keys = getKeys();
   if (!keys.public) { alert("公開鍵が必要です（鍵を生成してください）"); return; }
-  // set mining UI
   miningStatusEl.textContent = "マイニング中";
   const res = await fetch("/mine", {
     method: "POST",
@@ -155,42 +110,30 @@ document.getElementById("startMiningBtn").addEventListener("click", async () => 
   });
   const j = await res.json();
   if (j.status === "mining_started") {
-    // mining started on server; SSE will notify when finished
+    // マイニング中はSSEで完了通知を受信
   } else if (j.status === "already_mining") {
     alert("既にマイニング中です。");
-    miningStatusEl.textContent = "マイニング中";
+    miningStatusEl.textContent = "";
   } else {
     alert("マイニング開始に失敗しました");
     miningStatusEl.textContent = "";
   }
 });
 
-// SSE - receive realtime updates (try SSE, fallback to polling)
+// SSE - receive realtime updates
 function setupSSE() {
   const evtSource = new EventSource("/sse");
   evtSource.onmessage = (e) => {
     try {
       const d = JSON.parse(e.data);
-      if (d.type === "init") {
-        // merge longests: prefer longer chain
-        const serverChain = Array.isArray(d.chain) ? d.chain : [];
-        const localChain = JSON.parse(localStorage.getItem(KEYS.CHAIN) || "[]");
-        const longest = serverChain.length >= localChain.length ? serverChain : localChain;
-        localStorage.setItem(KEYS.CHAIN, JSON.stringify(longest));
-        displayChain(longest);
-        // clear mining status on init
-        miningStatusEl.textContent = "";
-      } else if (d.type === "new_block") {
-        const serverChain = Array.isArray(d.chain) ? d.chain : [];
-        const localChain = JSON.parse(localStorage.getItem(KEYS.CHAIN) || "[]");
-        const longest = serverChain.length >= localChain.length ? serverChain : localChain;
-        localStorage.setItem(KEYS.CHAIN, JSON.stringify(longest));
-        displayChain(longest);
-        // show success briefly then clear
-        miningStatusEl.textContent = "マイニング成功";
-        setTimeout(() => { miningStatusEl.textContent = ""; }, 2000);
+      if (d.type === "init" || d.type === "new_block") {
+        localStorage.setItem(KEYS.CHAIN, JSON.stringify(d.chain));
+        document.getElementById("chainView").textContent = formatChain(d.chain);
+        if(d.type === "new_block") miningStatusEl.textContent = "";
       } else if (d.type === "pending_tx") {
         localStorage.setItem(KEYS.PENDING, JSON.stringify(d.pending));
+      } else if (d.type === "mining_done") {
+        miningStatusEl.textContent = "";
       }
     } catch (err) {
       console.error(err);
@@ -198,7 +141,7 @@ function setupSSE() {
   };
   evtSource.onerror = (err) => {
     console.warn("SSE error, falling back to polling", err);
-    try { evtSource.close(); } catch (_) {}
+    evtSource.close();
     startPolling();
   };
 }
@@ -209,19 +152,20 @@ function startPolling() {
   pollInterval = setInterval(async () => {
     const res = await fetch("/get_chain");
     const j = await res.json();
-    const serverChain = Array.isArray(j.chain) ? j.chain : [];
-    const localChain = JSON.parse(localStorage.getItem(KEYS.CHAIN) || "[]");
-    const longest = serverChain.length >= localChain.length ? serverChain : localChain;
-    localStorage.setItem(KEYS.CHAIN, JSON.stringify(longest));
-    displayChain(longest);
+    localStorage.setItem(KEYS.CHAIN, JSON.stringify(j.chain));
+    document.getElementById("chainView").textContent = formatChain(j.chain);
   }, 3000);
+}
+
+// ブロックチェーン表示を整形
+function formatChain(chain) {
+  return chain.map(b => {
+    let txs = b.transactions.map(tx => `  ${tx.sender} -> ${tx.recipient} : ${tx.amount}`).join("\n");
+    return `Block ${b.index}\nTimestamp: ${b.timestamp}\nNonce: ${b.nonce}\nHash: ${b.hash}\nPrevioushash: ${b.previous_hash}\nTransactions:\n${txs}\n------------------------------`;
+  }).join("\n");
 }
 
 window.addEventListener("load", () => {
   showKeys();
   setupSSE();
 });
-
-
-
-
