@@ -2,7 +2,11 @@ import time
 import json
 import hashlib
 from datetime import datetime
+import pytz
 from ecdsa import VerifyingKey, SigningKey, NIST256p, BadSignatureError
+
+def jst_timestamp():
+    return datetime.now(pytz.timezone("Asia/Tokyo")).strftime("%Y/%m/%d  %H:%M:%S")
 
 def hash_block(block):
     block_string = json.dumps(block, sort_keys=True).encode()
@@ -21,16 +25,16 @@ class Transaction:
             "recipient": self.recipient,
             "amount": self.amount,
         }
-        # only include signature if present (prevents signature:null in JSON)
+        # only include signature if present
         if self.signature is not None:
             d["signature"] = self.signature
         return d
 
 class Block:
     def __init__(self, index, previous_hash, transactions, timestamp=None, nonce=0):
-        # timestamp will be a formatted string like "2025/12/03  17:09:35"
+        # timestamp will be JST formatted like "2025/12/03  17:09:35"
         if timestamp is None:
-            timestamp = datetime.now().strftime("%Y/%m/%d  %H:%M:%S")
+            timestamp = jst_timestamp()
         self.index = index
         self.timestamp = timestamp
         self.transactions = transactions
@@ -55,7 +59,7 @@ class Blockchain:
         self.create_genesis_block()
 
     def create_genesis_block(self):
-        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
+        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=jst_timestamp(), nonce=0)
         genesis.hash = hash_block(genesis.to_dict())
         self.chain.append(genesis)
 
@@ -70,7 +74,7 @@ class Blockchain:
         txs = self.pending_transactions + [reward_tx.to_dict()]
         index = len(self.chain)
         previous_hash = self.last_block().hash
-        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
+        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=jst_timestamp(), nonce=0)
 
         prefix = "0" * self.difficulty
         while True:
@@ -119,12 +123,11 @@ class Blockchain:
                     balance += tx.get("amount", 0)
                 if tx.get("sender") == pubkey_hex:
                     balance -= tx.get("amount", 0)
-        # pending txs reduce balance for sender
+        # pending txs reduce balance of sender
         for tx in self.pending_transactions:
             if tx.get("sender") == pubkey_hex:
                 balance -= tx.get("amount", 0)
         return balance
 
     def to_dict(self):
-        # returns list of block dicts with appended hash
         return [b.to_dict() | {"hash": b.hash} for b in self.chain]
