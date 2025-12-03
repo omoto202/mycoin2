@@ -27,7 +27,7 @@ function getKeys() {
 function showKeys() {
   const k = getKeys();
   const el = document.getElementById("keyInfo");
-  el.textContent = `public: ${k.public || "(なし)"}{\n}private: ${k.private ? "(保存済)" : "(なし)"}`;
+  el.textContent = `public: ${k.public || "(なし)"}\nprivate: ${k.private ? "(保存済)" : "(なし)"}`;
 }
 
 document.getElementById("genKeyBtn").addEventListener("click", async () => {
@@ -169,6 +169,7 @@ window.addEventListener("load", () => {
   showKeys();
   setupSSE();
 });
+
 
 
 
