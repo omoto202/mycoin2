@@ -6,7 +6,7 @@ class Miner:
         self.blockchain = blockchain
         self._running = False
         self.thread = None
-        self.broadcast_fn = broadcast_fn  # function to call with new block
+        self.broadcast_fn = broadcast_fn
 
     def start_mining_once(self, miner_address, reward=1):
         # run mining in background thread to avoid blocking request
