@@ -110,11 +110,11 @@ function displayChain(chain) {
     const prev = b.previous_hash ?? b.prev_hash ?? "(no previous_hash)";
 
     return [
-      `Block: ${idx}`,
+      `Block #${idx}`,
       `Timestamp: ${ts}`,
       `Nonce: ${nonce}`,
       `Hash: ${hash}`,
-      `Previoushash: ${prev}`,
+      `Prev: ${prev}`,
       `Transactions:`,
       `${txs}`,
       `------------------------------`
@@ -223,3 +223,4 @@ window.addEventListener("load", () => {
   showKeys();
   setupSSE();
 });
+
