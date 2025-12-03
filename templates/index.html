@@ -2,21 +2,21 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Simple Crypto Demo</title>
+    <title>My Coin Wallet</title>
   </head>
   <body>
-    <h1>Simple Crypto Demo</h1>
+    <h1>My Coin Wallet</h1>
 
     <section id="keys">
       <h2>鍵管理</h2>
-      <button id="genKeyBtn">鍵ペアを生成 (サーバー)</button>
-      <button id="resetKeysBtn">ローカル鍵をリセット (localStorage)</button>
+      <button id="genKeyBtn">鍵ペアを生成</button>
+      <button id="resetKeysBtn">鍵ペアをリセット</button>
       <div id="keyInfo"></div>
     </section>
 
     <section id="send">
       <h2>送金</h2>
-      <label>受信者公開鍵（hex）<br><input id="txRecipient" style="width:90%"></label><br>
+      <label>受信者公開鍵<br><input id="txRecipient" style="width:90%"></label><br>
       <label>金額<br><input id="txAmount" type="number" value="1"></label><br>
       <button id="sendTxBtn">送金する</button>
       <div id="sendResult"></div>
@@ -24,7 +24,7 @@
 
     <section id="balance">
       <h2>残高確認</h2>
-      <label>公開鍵（hex）<br><input id="balancePubkey" style="width:90%"></label><br>
+      <label>公開鍵<br><input id="balancePubkey" style="width:90%"></label><br>
       <button id="checkBalanceBtn">残高を計算</button>
       <div id="balanceResult"></div>
     </section>
@@ -32,7 +32,7 @@
     <section id="chain">
       <h2>ブロックチェーン</h2>
       <button id="refreshChainBtn">最新チェーンを取得</button>
-      <button id="clearLocalDataBtn">ローカルのトランザクションとチェーンを削除</button>
+      <button id="clearLocalDataBtn">ローカルストレージのチェーンを削除</button>
       <pre id="chainView" style="max-height:300px; overflow:auto; background:#f7f7f7; padding:8px;"></pre>
     </section>
 
