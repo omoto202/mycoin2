@@ -161,7 +161,7 @@ function startPolling() {
 function formatChain(chain) {
   return chain.map(b => {
     let txs = b.transactions.map(tx => `  ${tx.sender} -> ${tx.recipient} : ${tx.amount}`).join("\n");
-    return `Block ${b.index}\nTimestamp: ${b.timestamp}\nNonce: ${b.nonce}\nHash: ${b.hash}\nPrevioushash: ${b.previous_hash}\nTransactions:\n${txs}\n------------------------------`;
+    return `Block #${b.index}\nTimestamp: ${b.timestamp}\nNonce: ${b.nonce}\nHash: ${b.hash}\nPrev: ${b.previous_hash}\nTransactions:\n${txs}\n------------------------------`;
   }).join("\n");
 }
 
@@ -169,6 +169,7 @@ window.addEventListener("load", () => {
   showKeys();
   setupSSE();
 });
+
 
 
 
