@@ -28,9 +28,6 @@ class Transaction:
 
 class Block:
     def __init__(self, index, previous_hash, transactions, timestamp=None, nonce=0):
-        # timestamp will be a formatted string like "2025/12/03  17:09:35"
-        if timestamp is None:
-            timestamp = datetime.now().strftime("%Y/%m/%d  %H:%M:%S")
         self.index = index
         self.timestamp = timestamp
         self.transactions = transactions
@@ -55,7 +52,7 @@ class Blockchain:
         self.create_genesis_block()
 
     def create_genesis_block(self):
-        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
+        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=time.time(), nonce=0)
         genesis.hash = hash_block(genesis.to_dict())
         self.chain.append(genesis)
 
@@ -70,7 +67,7 @@ class Blockchain:
         txs = self.pending_transactions + [reward_tx.to_dict()]
         index = len(self.chain)
         previous_hash = self.last_block().hash
-        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
+        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=time.time(), nonce=0)
 
         prefix = "0" * self.difficulty
         while True:
