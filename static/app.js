@@ -27,7 +27,7 @@ function getKeys() {
 function showKeys() {
   const k = getKeys();
   const el = document.getElementById("keyInfo");
-  el.textContent = `public: ${k.public || "(なし)"}'\n'private: ${k.private ? "(保存済)" : "(なし)"}`;
+  el.textContent = `public: ${k.public || "(なし)"\n}private: ${k.private ? "(保存済)" : "(なし)"}`;
 }
 
 // request server to generate keypair
@@ -35,12 +35,10 @@ document.getElementById("genKeyBtn").addEventListener("click", async () => {
   const res = await fetch("/generate_key", {method: "POST"});
   const j = await res.json();
   saveKeys(j.private_key, j.public_key);
-  alert("鍵ペアを生成しました。");
 });
 
 document.getElementById("resetKeysBtn").addEventListener("click", () => {
   resetKeysLocal();
-  alert("鍵ペアを削除しました。");
 });
 
 document.getElementById("sendTxBtn").addEventListener("click", async () => {
@@ -223,5 +221,6 @@ window.addEventListener("load", () => {
   showKeys();
   setupSSE();
 });
+
 
 
