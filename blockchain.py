@@ -1,6 +1,7 @@
 import time
 import json
 import hashlib
+from datetime import datetime
 from ecdsa import VerifyingKey, SigningKey, NIST256p, BadSignatureError
 
 def hash_block(block):
@@ -15,17 +16,23 @@ class Transaction:
         self.signature = signature
 
     def to_dict(self):
-        return {
+        d = {
             "sender": self.sender,
             "recipient": self.recipient,
             "amount": self.amount,
-            "signature": self.signature,
         }
+        # only include signature if present (prevents signature:null in JSON)
+        if self.signature is not None:
+            d["signature"] = self.signature
+        return d
 
 class Block:
     def __init__(self, index, previous_hash, transactions, timestamp=None, nonce=0):
+        # timestamp will be a formatted string like "2025/12/03  17:09:35"
+        if timestamp is None:
+            timestamp = datetime.now().strftime("%Y/%m/%d  %H:%M:%S")
         self.index = index
-        self.timestamp = timestamp or time.time()
+        self.timestamp = timestamp
         self.transactions = transactions
         self.previous_hash = previous_hash
         self.nonce = nonce
@@ -48,7 +55,7 @@ class Blockchain:
         self.create_genesis_block()
 
     def create_genesis_block(self):
-        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=time.time(), nonce=0)
+        genesis = Block(index=0, previous_hash="0", transactions=[], timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
         genesis.hash = hash_block(genesis.to_dict())
         self.chain.append(genesis)
 
@@ -63,7 +70,7 @@ class Blockchain:
         txs = self.pending_transactions + [reward_tx.to_dict()]
         index = len(self.chain)
         previous_hash = self.last_block().hash
-        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=time.time(), nonce=0)
+        block = Block(index=index, previous_hash=previous_hash, transactions=txs, timestamp=datetime.now().strftime("%Y/%m/%d  %H:%M:%S"), nonce=0)
 
         prefix = "0" * self.difficulty
         while True:
@@ -108,15 +115,16 @@ class Blockchain:
         balance = 0
         for block in self.chain:
             for tx in block.transactions:
-                if tx["recipient"] == pubkey_hex:
-                    balance += tx["amount"]
-                if tx["sender"] == pubkey_hex:
-                    balance -= tx["amount"]
+                if tx.get("recipient") == pubkey_hex:
+                    balance += tx.get("amount", 0)
+                if tx.get("sender") == pubkey_hex:
+                    balance -= tx.get("amount", 0)
         # pending txs reduce balance for sender
         for tx in self.pending_transactions:
-            if tx["sender"] == pubkey_hex:
-                balance -= tx["amount"]
+            if tx.get("sender") == pubkey_hex:
+                balance -= tx.get("amount", 0)
         return balance
 
     def to_dict(self):
+        # returns list of block dicts with appended hash
         return [b.to_dict() | {"hash": b.hash} for b in self.chain]
